@@ -1,0 +1,10 @@
+# Cursor Rules (映画MBTI v1.0)
+- Stack: Next.js(App Router) + TypeScript(strict) + Tailwind + shadcn/ui
+- Routes: /, /diagnose, /result, /type/[code], /title/[id], /lists, /membership, /account, /about, /privacy, /terms
+- 禁止: 結果カードではタイトル/監督/評価点を出さない（Reveal後のみ）
+- 優先: スマホ1st、a11y（フォーカス/aria）、コピーは短文化、見出し31字以内
+- RSC原則: Server Componentを基本、必要箇所のみ "use client"
+- 作業手順: PLAN→IMPLEMENT→VERIFY→SUMMARY、小さなコミットに分割
+- コミット規約: Conventional Commits（feat/fix/docs/style/refactor/test/chore）
+
+
