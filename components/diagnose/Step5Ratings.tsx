@@ -1,11 +1,13 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ThumbsUp, ThumbsDown, Minus } from 'lucide-react'
-import { sampleTitles, type SampleTitle } from '@/lib/data/sampleTitles'
+import { ThumbsUp, ThumbsDown, Minus, Loader2 } from 'lucide-react'
+import { DiagnosisMovie } from '@/lib/types/tmdb'
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
 
 interface Step5RatingsProps {
   ratings: Record<number, number> // {titleId: rating}
@@ -20,10 +22,37 @@ export function Step5Ratings({
   onNext,
   onBack,
 }: Step5RatingsProps) {
+  const [movies, setMovies] = useState<DiagnosisMovie[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchMovies()
+  }, [])
+
+  const fetchMovies = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/titles/samples')
+      const data = await response.json()
+      
+      if (data.titles) {
+        setMovies(data.titles)
+      } else {
+        throw new Error(data.error || 'Failed to fetch movies')
+      }
+    } catch (err) {
+      console.error('Error fetching movies:', err)
+      setError('映画データの取得に失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const ratedCount = Object.keys(ratings).length
 
-  const getRatingButton = (title: SampleTitle, ratingValue: number) => {
-    const currentRating = ratings[title.id]
+  const getRatingButton = (movie: DiagnosisMovie, ratingValue: number) => {
+    const currentRating = ratings[movie.id]
     const isActive = currentRating === ratingValue
 
     const icons = {
@@ -47,12 +76,12 @@ export function Step5Ratings({
 
     return (
       <button
-        onClick={() => onRatingChange(title.id, ratingValue)}
+        onClick={() => onRatingChange(movie.id, ratingValue)}
         className={cn(
           'flex h-10 w-10 items-center justify-center rounded-md border-2 transition-colors',
           colors[String(ratingValue) as '1' | '0' | '-1']
         )}
-        aria-label={`${title.copy}を${
+        aria-label={`${movie.title_ja}を${
           ratingValue === 1
             ? 'いいね'
             : ratingValue === 0
@@ -66,6 +95,43 @@ export function Step5Ratings({
     )
   }
 
+  const getPosterUrl = (posterPath: string | null | undefined) => {
+    if (!posterPath) return '/api/placeholder/500/750'
+    return `https://image.tmdb.org/t/p/w500${posterPath}`
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-8">
+        <div className="text-center">
+          <h2 className="mb-2 text-2xl font-bold text-slate-900">
+            既知作品の評価
+          </h2>
+          <p className="text-slate-600">映画データを読み込み中...</p>
+        </div>
+        <div className="flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-600" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-8">
+        <div className="text-center">
+          <h2 className="mb-2 text-2xl font-bold text-slate-900">
+            既知作品の評価
+          </h2>
+          <p className="text-red-600">{error}</p>
+          <Button onClick={fetchMovies} className="mt-4">
+            再試行
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <div className="text-center">
@@ -73,11 +139,10 @@ export function Step5Ratings({
           既知作品の評価
         </h2>
         <p className="text-slate-600">
-          観たことがある作品を評価してください（{ratedCount}/
-          {sampleTitles.length}）
+          観たことがある作品を評価してください（{ratedCount}/{movies.length}）
         </p>
         <p className="mt-2 text-sm text-slate-500">
-          ※ タイトルは非表示です。雰囲気で判断してください
+          ※ タイトルと画像で判断してください
         </p>
       </div>
 
@@ -99,39 +164,78 @@ export function Step5Ratings({
         </CardContent>
       </Card>
 
-      {/* 作品グリッド */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {sampleTitles.map((title) => (
+      {/* 映画グリッド */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {movies.map((movie) => (
           <Card
-            key={title.id}
+            key={movie.id}
             className={cn(
-              'transition-shadow',
-              ratings[title.id] !== undefined && 'ring-2 ring-slate-900'
+              'transition-all hover:shadow-lg',
+              ratings[movie.id] !== undefined && 'ring-2 ring-slate-900'
             )}
           >
-            <CardContent className="pt-6">
-              {/* コピー（固有名詞なし） */}
-              <p className="mb-3 font-medium text-slate-900">{title.copy}</p>
-
-              {/* タグ */}
-              <div className="mb-4 flex flex-wrap gap-2">
-                {title.tags.map((tag, index) => (
-                  <Badge key={index} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
+            <CardContent className="p-0">
+              {/* ポスター画像 */}
+              <div className="relative h-64 w-full overflow-hidden rounded-t-lg">
+                <Image
+                  src={getPosterUrl(movie.poster_path)}
+                  alt={`${movie.title_ja}のポスター`}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = '/placeholder-movie.jpg'
+                  }}
+                />
+                {ratings[movie.id] !== undefined && (
+                  <div className="absolute right-2 top-2">
+                    <Badge 
+                      variant={ratings[movie.id] === 1 ? 'default' : ratings[movie.id] === -1 ? 'destructive' : 'secondary'}
+                      className="bg-white/90 text-slate-900"
+                    >
+                      {ratings[movie.id] === 1 ? '✓' : ratings[movie.id] === -1 ? '✗' : '○'}
+                    </Badge>
+                  </div>
+                )}
               </div>
 
-              {/* メタ情報 */}
-              <div className="mb-4 text-xs text-slate-500">
-                {title.year} · {title.genres.join(', ')}
-              </div>
+              <div className="p-4">
+                {/* タイトル */}
+                <h3 className="mb-2 font-semibold text-slate-900 line-clamp-2">
+                  {movie.title_ja}
+                </h3>
+                {movie.title_en !== movie.title_ja && (
+                  <p className="mb-2 text-sm text-slate-600 line-clamp-1">
+                    {movie.title_en}
+                  </p>
+                )}
 
-              {/* 評価ボタン */}
-              <div className="flex justify-center gap-2">
-                {getRatingButton(title, 1)}
-                {getRatingButton(title, 0)}
-                {getRatingButton(title, -1)}
+                {/* メタ情報 */}
+                <div className="mb-3 text-xs text-slate-500">
+                  {movie.year} · {movie.genres.slice(0, 2).join(', ')}
+                  {movie.vote_average && (
+                    <span className="ml-2">⭐ {movie.vote_average.toFixed(1)}</span>
+                  )}
+                </div>
+
+                {/* タグ */}
+                {movie.tags && movie.tags.length > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-1">
+                    {movie.tags.slice(0, 3).map((tag, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                {/* 評価ボタン */}
+                <div className="flex justify-center gap-2">
+                  {getRatingButton(movie, 1)}
+                  {getRatingButton(movie, 0)}
+                  {getRatingButton(movie, -1)}
+                </div>
               </div>
             </CardContent>
           </Card>

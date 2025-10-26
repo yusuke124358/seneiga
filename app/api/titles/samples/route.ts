@@ -1,37 +1,35 @@
 import { NextResponse } from 'next/server'
-import { sampleTitles } from '@/lib/data/sampleTitles'
+import { generateDiagnosisMovies } from '@/lib/data/diagnosisMovies'
 
 export async function GET() {
   try {
-    /* TODO: Supabase接続時にコメント解除
-    const { createClient } = await import('@supabase/supabase-js')
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    const { data, error } = await supabase
-      .from('titles_sample')
-      .select('*')
-      .eq('is_active', true)
-      .order('popularity_score', { ascending: false })
-      .limit(12)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ titles: data })
-    */
-
-    // 現在はダミーデータを返す
-    return NextResponse.json({ titles: sampleTitles })
+    // TMDBから診断用映画データを取得
+    const movies = await generateDiagnosisMovies()
+    
+    return NextResponse.json({ 
+      titles: movies,
+      source: 'tmdb',
+      count: movies.length 
+    })
   } catch (error) {
     console.error('Error in /api/titles/samples:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    
+    // フォールバック: 既存のサンプルデータを使用
+    try {
+      const { sampleTitles } = await import('@/lib/data/sampleTitles')
+      return NextResponse.json({ 
+        titles: sampleTitles,
+        source: 'fallback',
+        count: sampleTitles.length,
+        error: 'TMDB API unavailable, using fallback data'
+      })
+    } catch (fallbackError) {
+      console.error('Fallback data also failed:', fallbackError)
+      return NextResponse.json(
+        { error: 'Unable to fetch movie data' },
+        { status: 500 }
+      )
+    }
   }
 }
 
