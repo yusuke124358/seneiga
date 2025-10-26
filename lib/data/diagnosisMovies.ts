@@ -108,9 +108,12 @@ export const DIAGNOSIS_MOVIE_CUSTOM_DATA: Partial<DiagnosisMovie>[] = [
 export async function generateDiagnosisMovies(): Promise<DiagnosisMovie[]> {
   try {
     // TMDBから映画データを取得
-    const { getMultipleMovieDetails, getGenres } = await import('../services/tmdb')
-    const movies = await getMultipleMovieDetails(DIAGNOSIS_MOVIE_IDS)
-    const genres = await getGenres()
+    const { getMovieDetails, getMovieGenres } = await import('../services/tmdb')
+    
+    // 複数の映画を並列取得
+    const moviePromises = DIAGNOSIS_MOVIE_IDS.map(id => getMovieDetails(id))
+    const movies = await Promise.all(moviePromises)
+    const genres = await getMovieGenres()
     
     // ジャンルIDを名前に変換
     const genreMap = new Map(genres.map(g => [g.id, g.name]))
